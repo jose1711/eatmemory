@@ -11,22 +11,29 @@
 #include <ctype.h>
 #include <stdbool.h>
 #include <unistd.h>
+#include <sys/vminfo.h>
+
 
 #if defined(_SC_PHYS_PAGES) && defined(_SC_AVPHYS_PAGES) && defined(_SC_PAGE_SIZE)
 #define MEMORY_PERCENTAGE
 #endif
 
 #ifdef MEMORY_PERCENTAGE
-size_t getTotalSystemMemory(){
-    long pages = sysconf(_SC_PHYS_PAGES);
-    long page_size = sysconf(_SC_PAGE_SIZE);
-    return pages * page_size;
+size64_t getTotalSystemMemory(){
+    long pages = sysconf(_SC_AIX_REALMEM) * 1024;
+    return pages;
 }
 
-size_t getFreeSystemMemory(){
-    long pages = sysconf(_SC_AVPHYS_PAGES);
-    long page_size = sysconf(_SC_PAGE_SIZE);
-    return pages * page_size;
+size64_t getFreeSystemMemory(){
+    struct vminfo meminfo;
+    vmgetinfo(&meminfo, VMINFO, sizeof(meminfo));
+    return meminfo.memavailable;
+}
+
+size64_t getFreePagingSpace(){
+    struct vminfo meminfo;
+    vmgetinfo(&meminfo, VMINFO, sizeof(meminfo));
+    return meminfo.psfreeblks * 4096;
 }
 #endif
 
@@ -47,6 +54,7 @@ int main(int argc, char *argv[]){
 #ifdef MEMORY_PERCENTAGE
     printf("Currently total memory: %zd\n",getTotalSystemMemory());
     printf("Currently avail memory: %zd\n",getFreeSystemMemory());
+    printf("Currently available paging space: %zd\n",getFreePagingSpace());
 #endif
 
     int i;
@@ -82,7 +90,7 @@ int main(int argc, char *argv[]){
                     exit(0);
                 }
             }else{
-                size=atoi(arg);
+                size=atol(arg);
             }
             printf("Eating %ld bytes in chunks of %d...\n",size,chunk);
             if(eat(size,chunk)){
@@ -102,4 +110,3 @@ int main(int argc, char *argv[]){
     }
 
 }
-
